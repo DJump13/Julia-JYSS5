@@ -1,6 +1,5 @@
 using Match
 using Test
-#Pkg.add("Match")
 
 abstract type ExprC end
 struct NumC <: ExprC
@@ -68,6 +67,7 @@ function interp(a::ExprC, env::Dict{Symbol,Value})::Value
                 else
                     interp(e, env)
                 end
+            _ => error("JYSS: IF DOES NOT EVALUATE TO BOOLEAN")
         end
         LamC(args, body) => ClosV(args, body, env)
         AppC(body, args) => @match body begin
@@ -86,11 +86,33 @@ function interp(a::ExprC, env::Dict{Symbol,Value})::Value
                                     NumV(n) => (n == interp(args[2], env).n)
                                     BoolV(b) => (b == interp(args[2], env).b)
                                     StrV(s) => (s == interp(args[2], env).s)
+                                    _ => false
                                 end)
                         end
+                    elseif length(args) == 1
+                        @match interp(args[1], env) begin
+                            PrimopV(:error) => error("JYSS: USER ERROR")
+                            _ => error("JYSS: PRIMOP NEEDS 2 ARGUMENTS")
+                        end
+                    else
+                        error("JYSS: PRIMOP NEEDS 2 ARGUMENTS")
                     end
+                ClosV(cargs, cbody, cenv) => interp(cbody, addToEnv(cenv, cargs, interpList(args, env)))
+                _ => error("JYSS: INVALID SYNTAX")
             end
         end
+    end
+end
+
+function interpList(vals::Array{ExprC}, env::Dict{Symbol,Value})::Array{Value}
+    map(v -> interp(v, env), vals)
+end
+
+function addToEnv(env::Dict{Symbol,Value}, args::Array{Symbol}, vals::Array{Value})::Dict{Symbol,Value}
+    if length(args) == length(vals)
+        merge(env, Dict(zip(args, vals)))
+    else
+        error("JYSS: WRONG NUMBER OF ARGUMENTS")
     end
 end
 
@@ -98,6 +120,11 @@ end
 @test interp(IfC(AppC(IdC(:<=), [NumC(5), NumC(4)]), NumC(1), NumC(-1)), makeEnv) == NumV(-1)
 @test interp(AppC(IdC(:+), [AppC(IdC(:-), [NumC(10), NumC(7)]), NumC(5)]), makeEnv) == NumV(8)
 @test interp(AppC(IdC(:*), [AppC(IdC(:/), [NumC(10), NumC(2)]), NumC(5)]), makeEnv) == NumV(25.0)
+@test interp(IfC(AppC(IdC(:equal), [StrC("BRUH"), StrC("BRUH")]), NumC(1), NumC(-1)), makeEnv) == NumV(1)
+
+#below test is equivalent to running {{proc {x y} go {+ x y}} {{+ 9 14} 98}}
+@test interp(AppC(LamC([:x, :y], AppC(IdC(:+), [IdC(:x), IdC(:y)])), [AppC(IdC(:+), [NumC(9), NumC(14)]), NumC(98)]), makeEnv) == NumV(121)
+#ClosV([:a, :b, :c], NumC(3), makeEnv)
 #interp(AppC(IdC(:error), [NumC(5), NumC(5)]), makeEnv)
 
 
