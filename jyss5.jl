@@ -117,15 +117,25 @@ function addToEnv(env::Dict{Symbol,Value}, args::Array{Symbol}, vals::Array{Valu
 end
 
 @test interp(IdC(:+), makeEnv) == PrimopV(:+)
+@test interp(NumC(5), makeEnv) == NumV(5)
+@test interp(StrC("Hello"), makeEnv) == StrV("Hello")
+
+@test interpList([IdC(:+), NumC(5)], makeEnv) == [PrimopV(:+), NumV(5)]
+
 @test interp(IfC(AppC(IdC(:<=), [NumC(5), NumC(4)]), NumC(1), NumC(-1)), makeEnv) == NumV(-1)
 @test interp(AppC(IdC(:+), [AppC(IdC(:-), [NumC(10), NumC(7)]), NumC(5)]), makeEnv) == NumV(8)
 @test interp(AppC(IdC(:*), [AppC(IdC(:/), [NumC(10), NumC(2)]), NumC(5)]), makeEnv) == NumV(25.0)
 @test interp(IfC(AppC(IdC(:equal), [StrC("BRUH"), StrC("BRUH")]), NumC(1), NumC(-1)), makeEnv) == NumV(1)
 
-#below test is equivalent to running {{proc {x y} go {+ x y}} {{+ 9 14} 98}}
-@test interp(AppC(LamC([:x, :y], AppC(IdC(:+), [IdC(:x), IdC(:y)])), [AppC(IdC(:+), [NumC(9), NumC(14)]), NumC(98)]), makeEnv) == NumV(121)
-#ClosV([:a, :b, :c], NumC(3), makeEnv)
-#interp(AppC(IdC(:error), [NumC(5), NumC(5)]), makeEnv)
+#below test is equivalent to running '{{proc {x y} go {+ x y}} {{+ 9 14} 98}}
+@test interp(AppC(LamC([:x, :y], AppC(IdC(:+), [IdC(:x), IdC(:y)])),
+        [AppC(IdC(:+), [NumC(9), NumC(14)]), NumC(98)]), makeEnv) == NumV(121)
+#below test is equivalent to running '{{proc {a b} go {- a b}} {{* 2 2} 3}}
+@test interp(AppC(LamC([:a, :b], AppC(IdC(:-), [IdC(:a), IdC(:b)])),
+        [AppC(IdC(:*), [NumC(2), NumC(2)]), NumC(3)]), makeEnv) == NumV(1)
+
+@test_throws "JYSS: PRIMOP NEEDS 2 ARGUMENTS" interp(AppC(IdC(:+), [NumC(5)]), makeEnv)
+@test_throws "JYSS: IF DOES NOT EVALUATE TO BOOLEAN" interp(IfC(NumC(1), NumC(2), NumC(3)), makeEnv)
 
 
 
